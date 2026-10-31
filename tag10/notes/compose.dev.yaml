@@ -1,0 +1,11 @@
+# compose.dev.yaml – Entwicklung, nur per -f zusammen mit compose.yaml (Stand Tag 10)
+services:
+  web:
+    build:
+      target: build
+    # entrypoint ["/bin/sh", "-c"] aus compose.yaml gilt weiter: Wrapper mit --watch
+    command:
+      - NOTES_API_KEY="$$(cat /run/secrets/api_key)" exec node --watch server.js
+    environment:
+      NODE_ENV: development
+    read_only: false

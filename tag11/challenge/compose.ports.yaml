@@ -1,0 +1,15 @@
+# compose.ports.yaml – Challenge Tag 11: Redirect auf den veröffentlichten HTTPS-Port
+services:
+  proxy:
+    environment:
+      HTTPS_PORT: ${HTTPS_PORT:-8443}
+    ports: !override
+      - "127.0.0.1:${HTTPS_PORT:-8443}:${HTTPS_PORT:-8443}"
+      - "127.0.0.1:${HTTP_PORT:-8000}:80"
+    configs: !override
+      - source: caddyfile_ports
+        target: /etc/caddy/Caddyfile
+
+configs:
+  caddyfile_ports:
+    file: ./proxy/Caddyfile.ports

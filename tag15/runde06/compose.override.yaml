@@ -1,0 +1,8 @@
+# compose.override.yaml – Entwicklung (Tag 6), wird automatisch geladen
+services:
+  web:
+    build:
+      target: build
+    command: ["node", "--watch", "server.js"]
+    environment:
+      NODE_ENV: development

@@ -1,0 +1,18 @@
+# compose.prod.yaml – Server-Deploy, nur per -f zusammen mit compose.yaml (Tag 14)
+# file:-Quellen sind Bind-Mounts: Der Pfad gilt auf dem Docker-Host, nicht auf
+# dem Mac. Secrets und Configs liegen deshalb auf dem Server unter SERVER_DIR.
+# (environment:/content: gehen nicht: Compose kopiert sie in den Container, und
+# der ist read_only – live geprüft.)
+secrets:
+  api_key: !override
+    file: ${SERVER_DIR:-/home/deploy/notes}/secrets/api_key.txt
+  db_password: !override
+    file: ${SERVER_DIR:-/home/deploy/notes}/secrets/db_password.txt
+  db_url: !override
+    file: ${SERVER_DIR:-/home/deploy/notes}/secrets/db_url.txt
+
+configs:
+  db_init: !override
+    file: ${SERVER_DIR:-/home/deploy/notes}/db/init/10-readonly.sql
+  caddyfile: !override
+    file: ${SERVER_DIR:-/home/deploy/notes}/proxy/Caddyfile

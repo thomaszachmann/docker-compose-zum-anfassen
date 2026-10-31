@@ -1,0 +1,14 @@
+{
+	skip_install_trust
+}
+
+notes.localhost {
+	tls internal
+	encode gzip
+	header {
+		Strict-Transport-Security "max-age=31536000"
+		X-Content-Type-Options "nosniff"
+		-Server
+	}
+	reverse_proxy web:3000
+}

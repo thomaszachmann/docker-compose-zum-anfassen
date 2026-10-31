@@ -1,0 +1,10 @@
+# compose.restore.yaml – Challenge Tag 7: Restore aus backup/notes.sql
+services:
+  restore:
+    extends:
+      file: compose.tools.yaml
+      service: psql
+    entrypoint: ["psql", "-v", "ON_ERROR_STOP=1", "-q", "-o", "/dev/null"]
+    command: ["-f", "/backup/notes.sql"]
+    volumes:
+      - ./backup:/backup:ro

@@ -1,0 +1,7 @@
+# dollar/compose.yaml – Tag 4, Drill 5: wer ersetzt das Dollarzeichen?
+name: notes-dollar
+
+services:
+  hallo:
+    image: alpine:3.24
+    command: ["sh", "-c", "echo Compose: $HOME / Container: $$HOME"]

@@ -1,0 +1,36 @@
+# compose.yaml – Stand Ende Tag 2
+name: notes
+
+services:
+  api:
+    build: notes-api
+    environment:
+      NOTES_API_KEY: ${NOTES_API_KEY}
+    ports:
+      - "127.0.0.1:${API_PORT:-8080}:8080"
+    networks: [frontend, backend]
+
+  worker:
+    build: notes-worker
+    environment:
+      NOTES_API_URL: http://api:8080
+      NOTES_API_KEY: ${NOTES_API_KEY}
+    depends_on:
+      - api
+    networks: [backend]
+
+  web:
+    build: notes-web
+    environment:
+      NOTES_API_URL: http://api:8080
+      NOTES_API_KEY: ${NOTES_API_KEY}
+    ports:
+      - "127.0.0.1:${WEB_PORT:-3000}:3000"
+    depends_on:
+      - api
+    networks: [frontend]
+
+networks:
+  frontend: {}
+  backend:
+    internal: true

@@ -1,0 +1,24 @@
+# compose.yaml – simulierter Server notes-server (Tag 14), nur für das Lab
+name: notes-server
+
+services:
+  server:
+    build: .
+    hostname: notes-server
+    privileged: true          # Docker im Container braucht das – nur im Lab!
+    ports:
+      - "127.0.0.1:${SSH_PORT:-2222}:22"
+    volumes:
+      - ./keys:/keys:ro
+      - server_docker:/var/lib/docker
+      - server_home:/home/deploy
+    healthcheck:
+      test: ["CMD", "docker", "info"]
+      interval: 10s
+      start_period: 30s
+      start_interval: 1s
+    restart: unless-stopped
+
+volumes:
+  server_docker: {}
+  server_home: {}

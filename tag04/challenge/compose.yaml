@@ -1,0 +1,66 @@
+# compose.yaml – Challenge Tag 4: zweites Init-Skript per configs.content
+name: notes
+
+services:
+  api:
+    build: notes-api
+    environment:
+      NOTES_API_KEY: ${NOTES_API_KEY:?NOTES_API_KEY fehlt (.env)}
+      NOTES_DB_URL: "postgres://notes:\
+        ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD fehlt (.env)}@db:5432/notes"
+    ports:
+      - "127.0.0.1:${API_PORT:-8080}:8080"
+    networks: [frontend, backend]
+    depends_on:
+      - db
+
+  worker:
+    build: notes-worker
+    environment:
+      NOTES_API_URL: http://api:8080
+      NOTES_API_KEY: ${NOTES_API_KEY:?NOTES_API_KEY fehlt (.env)}
+      INTERVAL: ${WORKER_INTERVAL:-10}
+    depends_on:
+      - api
+    networks: [backend]
+
+  web:
+    build: notes-web
+    environment:
+      NOTES_API_URL: http://api:8080
+      NOTES_API_KEY: ${NOTES_API_KEY:?NOTES_API_KEY fehlt (.env)}
+    ports:
+      - "127.0.0.1:${WEB_PORT:-3000}:3000"
+    depends_on:
+      - api
+    networks: [frontend]
+
+  db:
+    image: postgres:18.6-alpine
+    environment:
+      POSTGRES_USER: notes
+      POSTGRES_DB: notes
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD fehlt (.env)}
+    volumes:
+      - pgdata:/var/lib/postgresql
+    configs:
+      - source: db_init
+        target: /docker-entrypoint-initdb.d/10-readonly.sql
+      - source: db_comment
+        target: /docker-entrypoint-initdb.d/20-comment.sql
+    networks: [backend]
+
+networks:
+  frontend: {}
+  backend:
+    internal: true
+
+volumes:
+  pgdata: {}
+
+configs:
+  db_init:
+    file: ./db/init/10-readonly.sql
+  db_comment:
+    content: |
+      COMMENT ON DATABASE notes IS 'Projekt ${COMPOSE_PROJECT_NAME}, Tag 4';

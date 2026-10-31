@@ -1,0 +1,9 @@
+# ssh_config – Lab-Server notes-server (Tag 14), per Include in ~/.ssh/config
+Host notes-server
+  HostName 127.0.0.1
+  Port 2222
+  User deploy
+  IdentityFile ~/compose-lab/tag14/server/keys/id_ed25519
+  IdentitiesOnly yes
+  StrictHostKeyChecking accept-new
+  UserKnownHostsFile ~/compose-lab/tag14/server/known_hosts

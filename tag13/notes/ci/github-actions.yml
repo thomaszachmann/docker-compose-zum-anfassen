@@ -1,0 +1,21 @@
+# ci/github-actions.yml – Beispiel (Tag 13), nicht ausgeführt.
+# Im Repository als .github/workflows/ci.yml ablegen.
+name: ci
+on:
+  push:
+  pull_request:
+
+jobs:
+  integration:
+    runs-on: ubuntu-latest        # Docker und das Compose-Plugin sind vorinstalliert
+    timeout-minutes: 15           # ein hängendes up darf den Runner nicht blockieren
+    steps:
+      - uses: actions/checkout@v7
+      - name: Secrets aus dem Secret-Store
+        env:
+          NOTES_API_KEY: ${{ secrets.NOTES_API_KEY }}
+        run: |
+          mkdir -p secrets
+          printf '%s' "$NOTES_API_KEY" > secrets/api_key.txt
+      - name: Pipeline
+        run: ci/pipeline.sh "ci-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"

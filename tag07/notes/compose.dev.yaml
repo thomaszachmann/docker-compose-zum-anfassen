@@ -1,0 +1,8 @@
+# compose.dev.yaml – Entwicklung, nur per -f zusammen mit compose.yaml (Tag 7)
+services:
+  web:
+    build:
+      target: build
+    command: ["node", "--watch", "server.js"]
+    environment:
+      NODE_ENV: development

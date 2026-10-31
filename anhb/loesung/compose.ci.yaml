@@ -1,0 +1,18 @@
+# compose.ci.yaml – CI, nur per -f zusammen mit compose.yaml
+services:
+  api:
+    ports: !reset []
+  web:
+    ports: !reset []
+  tests:
+    image: curlimages/curl:8.23.0
+    profiles: [ci]
+    entrypoint: ["/bin/sh", "/tests/smoke.sh"]
+    volumes:
+      - ./tests:/tests:ro
+    networks: [frontend]
+    depends_on:
+      api:
+        condition: service_healthy
+      web:
+        condition: service_healthy

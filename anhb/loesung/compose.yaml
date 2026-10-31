@@ -1,0 +1,146 @@
+# compose.yaml – Anhang B, Lösung (Stand nach Übung 8)
+name: notes
+
+include:
+  - compose.tools.yaml
+
+x-api-build: &api-build
+  context: notes-api
+  target: final
+  args:
+    VERSION: ${TAG:-dev}
+
+x-hardening: &hardening
+  read_only: true
+  cap_drop: [ALL]
+  security_opt: ["no-new-privileges:true"]
+
+services:
+  api:
+    build: *api-build
+    image: ${COMPOSE_PROJECT_NAME}-api:${TAG:-dev}
+    <<: *hardening
+    environment:
+      NOTES_API_KEY_FILE: /run/secrets/api_key
+      NOTES_DB_URL_FILE: /run/secrets/db_url
+    secrets: [api_key, db_url]
+    deploy:
+      resources:
+        limits:
+          cpus: "0.50"
+          memory: 64M
+          pids: 100
+    ports:
+      - "127.0.0.1:${API_PORT:-8080}:8080"
+    networks: [frontend, backend]
+    depends_on:
+      db:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
+  migrate:
+    build: *api-build
+    image: ${COMPOSE_PROJECT_NAME}-api:${TAG:-dev}
+    command: ["migrate"]
+    <<: *hardening
+    environment:
+      NOTES_DB_URL_FILE: /run/secrets/db_url
+    secrets: [db_url]
+    networks: [backend]
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: "no"
+    healthcheck:
+      disable: true
+
+  worker:
+    build: notes-worker
+    image: ${COMPOSE_PROJECT_NAME}-worker:${TAG:-dev}
+    environment:
+      NOTES_API_URL: http://api:8080
+      NOTES_API_KEY: ${NOTES_API_KEY:?NOTES_API_KEY fehlt (.env)}
+      INTERVAL: ${WORKER_INTERVAL:-10}
+    networks: [backend]
+    depends_on:
+      api:
+        condition: service_healthy
+    restart: unless-stopped
+
+  web:
+    build: notes-web
+    image: ${COMPOSE_PROJECT_NAME}-web:${TAG:-dev}
+    environment:
+      NOTES_API_URL: http://api:8080
+      NOTES_API_KEY: ${NOTES_API_KEY:?NOTES_API_KEY fehlt (.env)}
+    ports:
+      - "127.0.0.1:${WEB_PORT:-3000}:3000"
+    networks: [frontend]
+    depends_on:
+      api:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3000/healthz"]
+      interval: 10s
+      timeout: 2s
+      start_period: 10s
+      start_interval: 1s
+    develop:
+      watch:
+        - action: sync
+          path: ./notes-web/public
+          target: /app/public
+        - action: sync+restart
+          path: ./notes-web/server.js
+          target: /app/server.js
+        - action: rebuild
+          path: ./notes-web/package.json
+
+  api-test:
+    profiles: [test]
+    build:
+      context: notes-api
+      target: test
+    image: ${COMPOSE_PROJECT_NAME}-api:test
+
+  db:
+    image: postgres:18.6-alpine
+    environment:
+      POSTGRES_USER: notes
+      POSTGRES_DB: notes
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD fehlt (.env)}
+    volumes:
+      - pgdata:/var/lib/postgresql
+    configs:
+      - source: db_init
+        target: /docker-entrypoint-initdb.d/10-readonly.sql
+    networks: [backend]
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "pg_isready", "-h", "127.0.0.1", "-U", "notes", "-d", "notes"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 30s
+      start_interval: 1s
+
+networks:
+  frontend: {}
+  backend:
+    internal: true
+
+volumes:
+  pgdata: {}
+
+configs:
+  db_init:
+    file: ./db/init/10-readonly.sql
+
+secrets:
+  api_key:
+    file: ./secrets/api_key.txt
+  db_url:
+    file: ./secrets/db_url.txt

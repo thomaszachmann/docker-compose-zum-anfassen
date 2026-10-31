@@ -1,0 +1,16 @@
+# ci/gitlab-ci.yml – Beispiel (Tag 13), nicht ausgeführt.
+# Im Repository als .gitlab-ci.yml ablegen. Docker-Executor mit Docker-in-Docker:
+# jeder Job hat seinen eigenen Docker-Daemon im Dienst docker.
+integration:
+  image: docker:29.9-cli
+  services:
+    - docker:29.9-dind
+  variables:
+    DOCKER_TLS_CERTDIR: "/certs"
+  timeout: 15 minutes
+  before_script:
+    - apk add --no-cache bash
+    - mkdir -p secrets
+    - printf '%s' "$NOTES_API_KEY" > secrets/api_key.txt
+  script:
+    - ci/pipeline.sh "ci-${CI_JOB_ID}"

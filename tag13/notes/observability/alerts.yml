@@ -1,0 +1,18 @@
+# alerts.yml – Tag 12: Alert-Regeln für notes
+groups:
+  - name: notes
+    rules:
+      - alert: NotesDBDown
+        expr: notes_db_up == 0
+        for: 30s
+        labels:
+          severity: critical
+        annotations:
+          summary: "notes-api erreicht die Datenbank nicht"
+      - alert: NotesAPIDown
+        expr: up{job="notes-api"} == 0
+        for: 30s
+        labels:
+          severity: critical
+        annotations:
+          summary: "Prometheus erreicht notes-api nicht"

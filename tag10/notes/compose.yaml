@@ -1,0 +1,203 @@
+# compose.yaml – Stand Ende Tag 10
+name: notes
+
+include:
+  - compose.tools.yaml
+
+x-api-build: &api-build
+  context: notes-api
+  target: final
+  args:
+    VERSION: ${TAG:-dev}
+
+x-hardening: &hardening
+  read_only: true
+  cap_drop: [ALL]
+  security_opt: ["no-new-privileges:true"]
+  logging:
+    driver: local
+    options:
+      max-size: "10m"
+      max-file: "3"
+
+services:
+  api:
+    <<: *hardening
+    build: *api-build
+    image: ${COMPOSE_PROJECT_NAME}-api:${TAG:-dev}
+    environment:
+      NOTES_API_KEY_FILE: /run/secrets/api_key
+      NOTES_DB_URL_FILE: /run/secrets/db_url
+    secrets: [api_key, db_url]
+    ports:
+      - "127.0.0.1:${API_PORT:-8080}:8080"
+    networks: [frontend, backend]
+    depends_on:
+      db:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: "0.50"
+          memory: 64M
+          pids: 100
+    develop:
+      watch:
+        - action: rebuild
+          path: ./notes-api
+
+  migrate:
+    <<: *hardening
+    build: *api-build
+    image: ${COMPOSE_PROJECT_NAME}-api:${TAG:-dev}
+    command: ["migrate"]
+    environment:
+      NOTES_DB_URL_FILE: /run/secrets/db_url
+    secrets: [db_url]
+    networks: [backend]
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: "no"
+    healthcheck:
+      disable: true
+    deploy:
+      resources:
+        limits:
+          cpus: "0.50"
+          memory: 64M
+
+  worker:
+    <<: *hardening
+    build: notes-worker
+    image: ${COMPOSE_PROJECT_NAME}-worker:${TAG:-dev}
+    init: true
+    environment:
+      NOTES_API_URL: http://api:8080
+      NOTES_API_KEY_FILE: /run/secrets/api_key
+      INTERVAL: ${WORKER_INTERVAL:-10}
+    secrets: [api_key]
+    networks: [backend]
+    depends_on:
+      api:
+        condition: service_healthy
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: "0.25"
+          memory: 128M
+          pids: 100
+    develop:
+      watch:
+        - action: rebuild
+          path: ./notes-worker
+
+  web:
+    <<: *hardening
+    build:
+      context: notes-web
+      secrets: [npmrc]
+    image: ${COMPOSE_PROJECT_NAME}-web:${TAG:-dev}
+    # notes-web kennt kein _FILE: der Wrapper liest das Secret beim Start
+    entrypoint: ["/bin/sh", "-c"]
+    command: ['NOTES_API_KEY="$$(cat /run/secrets/api_key)" exec node server.js']
+    environment:
+      NOTES_API_URL: http://api:8080
+    secrets: [api_key]
+    ports:
+      - "127.0.0.1:${WEB_PORT:-3000}:3000"
+    networks: [frontend]
+    tmpfs: [/tmp]
+    depends_on:
+      api:
+        condition: service_healthy
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: "0.50"
+          memory: 128M
+          pids: 100
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3000/healthz"]
+      interval: 10s
+      timeout: 2s
+      start_period: 10s
+      start_interval: 1s
+    develop:
+      watch:
+        - action: sync
+          path: ./notes-web/public
+          target: /app/public
+        - action: sync+restart
+          path: ./notes-web/server.js
+          target: /app/server.js
+        - action: rebuild
+          path: ./notes-web/package.json
+        - action: rebuild
+          path: ./notes-web/src
+
+  api-test:
+    profiles: [test]
+    build:
+      context: notes-api
+      target: test
+    image: ${COMPOSE_PROJECT_NAME}-api:test
+
+  db:
+    <<: *hardening
+    image: postgres:18.6-alpine
+    user: "70:70"
+    environment:
+      POSTGRES_USER: notes
+      POSTGRES_DB: notes
+      POSTGRES_PASSWORD_FILE: /run/secrets/db_password
+    secrets: [db_password]
+    volumes:
+      - pgdata:/var/lib/postgresql
+    tmpfs: [/var/run/postgresql, /tmp]
+    configs:
+      - source: db_init
+        target: /docker-entrypoint-initdb.d/10-readonly.sql
+    networks: [backend]
+    restart: unless-stopped
+    stop_grace_period: 30s
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 512M
+          pids: 200
+    healthcheck:
+      test: ["CMD", "pg_isready", "-h", "127.0.0.1", "-U", "notes", "-d", "notes"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 30s
+      start_interval: 1s
+
+networks:
+  frontend: {}
+  backend:
+    internal: true
+
+volumes:
+  pgdata: {}
+
+configs:
+  db_init:
+    file: ./db/init/10-readonly.sql
+
+secrets:
+  npmrc:
+    file: ./secrets/npmrc
+  api_key:
+    file: ./secrets/api_key.txt
+  db_password:
+    file: ./secrets/db_password.txt
+  db_url:
+    file: ./secrets/db_url.txt

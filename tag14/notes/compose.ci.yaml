@@ -1,0 +1,23 @@
+# compose.ci.yaml – CI, nur per -f zusammen mit compose.yaml (Tag 13)
+services:
+  api:
+    ports: !reset []
+  proxy:
+    ports: !reset []
+  tests:
+    image: curlimages/curl:8.23.0
+    profiles: [ci]
+    entrypoint: ["/bin/sh", "/tests/integration.sh"]
+    volumes:
+      - ./tests:/tests:ro
+    environment:
+      API_URL: http://api:8080
+      WEB_URL: http://web:3000
+      NOTES_API_KEY_FILE: /run/secrets/api_key
+    secrets: [api_key]
+    networks: [frontend]
+    depends_on:
+      api:
+        condition: service_healthy
+      web:
+        condition: service_healthy
